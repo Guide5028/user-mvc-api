@@ -1,6 +1,8 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 
+const VALID_GENDERS = ["male", "female", "other"];
+
 export const userController = {
   getAll: async (_req: FastifyRequest, reply: FastifyReply) => {
     const data = await userService.getAll();
@@ -26,6 +28,12 @@ export const userController = {
       });
     }
 
+    if (!VALID_GENDERS.includes(gender as string)) {
+      return reply.status(400).send({
+        message: `gender must be one of: ${VALID_GENDERS.join(", ")}`,
+      });
+    }
+
     const user = await userService.create(body as any);
     return reply.status(201).send(user);
   },
@@ -36,6 +44,14 @@ export const userController = {
     if (!existing) {
       return reply.status(404).send({ message: "User not found" });
     }
+
+    const body = req.body as Record<string, unknown>;
+    if (body.gender !== undefined && !VALID_GENDERS.includes(body.gender as string)) {
+      return reply.status(400).send({
+        message: `gender must be one of: ${VALID_GENDERS.join(", ")}`,
+      });
+    }
+
     const updated = await userService.update(id, req.body as any);
     return reply.status(200).send(updated);
   },
