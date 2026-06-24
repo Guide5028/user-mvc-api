@@ -18,6 +18,12 @@ src/
 There's no "View" here since this is a backend-only API (no frontend) — Insomnia plays
 the role of the client for testing.
 
+## Testing
+
+We test all endpoints manually using Insomnia, covering both the happy path
+(valid input) and the negative path (missing fields, invalid enum values,
+nonexistent ids).
+
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in `DATABASE_URL` from:
