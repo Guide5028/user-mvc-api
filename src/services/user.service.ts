@@ -3,7 +3,10 @@ import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
 export const userService = {
-  getAll: () => db.select().from(users),
+  getAll: (page: number, limit: number) => {
+    const offset = (page - 1) * limit;
+    return db.select().from(users).offset(offset).limit(limit);
+  },
 
   getById: async (id: number) => {
     const result = await db.select().from(users).where(eq(users.id, id));
