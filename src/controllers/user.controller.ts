@@ -4,10 +4,11 @@ import { userService } from "../services/user.service";
 const VALID_GENDERS = ["male", "female", "other"];
 
 export const userController = {
-  getAll: async (req: FastifyRequest<{ Querystring: { page?: string; limit?: string } }>, reply: FastifyReply) => {
+  getAll: async (req: FastifyRequest<{ Querystring: { page?: string; limit?: string; gender?: undefined | "male" | "female" | "other" } }>, reply: FastifyReply) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
-    const data = await userService.getAll(page, limit);
+    const gender = req.query.gender && VALID_GENDERS.includes(req.query.gender) ? req.query.gender : undefined;
+    const data = await userService.getAll(page, limit, gender);
     return reply.status(200).send(data);
   },
 
