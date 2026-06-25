@@ -1,7 +1,8 @@
-import { eq, gte, lte, and, inArray } from "drizzle-orm";
+import { eq, gte, lte, and, inArray, or, ilike} from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
+ilike 
 function yearsAgo(years: number): Date {
   const date = new Date();
   date.setFullYear(date.getFullYear() - years);
@@ -9,8 +10,11 @@ function yearsAgo(years: number): Date {
 }
 
 export const userService = {
-  getAll: (page: number, limit: number, gender?: "male" | "female" | "other", minAge?: number, maxAge?: number, nationalities?: string[]) => {
-    const offset = (page - 1) * limit;
+  getAll: (page: number, limit: number, gender?: "male" | "female" | "other", minAge?: number, maxAge?: number, nationalities?: string[], search?: string) => {
+
+  const searchCondition = search ? or(ilike(users.name, `%${search}%`), ilike(users.surname, `%${search}%`), ilike(users.email, `%${search}%`)) : undefined;
+  
+  const offset = (page - 1) * limit;
   const genderCondition = gender ? eq(users.gender, gender) : undefined;
   
   const minAgeCondition = minAge ? lte(users.dateOfBirth, yearsAgo(minAge)) : undefined;
@@ -18,7 +22,7 @@ export const userService = {
 
   const nationalityCondition = nationalities ? inArray(users.nationality, nationalities) : undefined;
   
-  const condition = and(genderCondition, minAgeCondition, maxAgeCondition, nationalityCondition);
+  const condition = and(searchCondition, genderCondition, minAgeCondition, maxAgeCondition, nationalityCondition);
 
   return db.select().from(users).where(condition).offset(offset).limit(limit);
   },
