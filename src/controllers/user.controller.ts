@@ -22,7 +22,7 @@ export const userController = {
     const maxAge = req.query.maxAge ? Number(req.query.maxAge) : undefined;
     const nationalities = req.query.nationalities ? req.query.nationalities.split(",") : undefined;
     const search = req.query.search;
-    const data = await userService.getAll(page, limit, gender, minAge, maxAge, nationalities, search);
+    const data = await userService.getAll(page, limit, { gender, minAge, maxAge, nationalities, search });
     return reply.status(200).send(data);
     
   },
