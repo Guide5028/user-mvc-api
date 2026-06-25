@@ -2,7 +2,6 @@ import { eq, gte, lte, and, inArray, or, ilike, asc, desc} from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
-
 interface UserFilters {
   gender?: "male" | "female" | "other";
   minAge?: number;
@@ -27,12 +26,25 @@ function buildWhereClause(filters: UserFilters) {
   return and(searchCondition, genderCondition, minAgeCondition, maxAgeCondition, nationalityCondition);
 }
 
+const SORTABLE_COLUMNS = {
+  name: users.name,
+  surname: users.surname,
+  createdAt: users.createdAt,
+};
+
+function buildOrderByClause(sortBy?: string, order?: "asc" | "desc") {
+  if (sortBy === "age") { return order === "desc" ? asc(users.dateOfBirth) : desc(users.dateOfBirth); }
+  const column = sortBy && sortBy in SORTABLE_COLUMNS ? SORTABLE_COLUMNS[sortBy as keyof typeof SORTABLE_COLUMNS] : users.id;
+  return order === "desc" ? desc(column) : asc(column);
+}
+
 export const userService = {
-  getAll: (page: number, limit: number, filters: UserFilters) => {
+  getAll: (page: number, limit: number, filters: UserFilters, sortBy?: string, order?: "asc" | "desc") => {
   const offset = (page - 1) * limit;
   const condition = buildWhereClause(filters);
+  const orderBy = buildOrderByClause(sortBy, order);
 
-  return db.select().from(users).where(condition).offset(offset).limit(limit);
+  return db.select().from(users).where(condition).offset(offset).limit(limit).orderBy(orderBy);
 },
 
   getById: async (id: number) => {
