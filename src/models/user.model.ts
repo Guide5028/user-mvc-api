@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 100 }).notNull(),
   surname: varchar("surname", { length: 100 }).notNull(),
   age: integer("age").notNull(),
+  dateOfBirth: timestamp("date_of_birth"),
   gender: genderEnum("gender").notNull(),
   nationality: varchar("nationality", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
