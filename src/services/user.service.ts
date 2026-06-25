@@ -1,12 +1,23 @@
-import { eq } from "drizzle-orm";
+import { eq, gte, lte, and } from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
+function yearsAgo(years: number): Date {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  return date;
+}
+
 export const userService = {
-  getAll: (page: number, limit: number, gender?: "male" | "female" | "other") => {
+  getAll: (page: number, limit: number, gender?: "male" | "female" | "other", minAge?: number, maxAge?: number) => {
     const offset = (page - 1) * limit;
-    const condition = gender ? eq(users.gender, gender) : undefined;
-    return db.select().from(users).where(condition).offset(offset).limit(limit);
+  const genderCondition = gender ? eq(users.gender, gender) : undefined;
+  const minAgeCondition = minAge ? lte(users.dateOfBirth, yearsAgo(minAge)) : undefined;
+  const maxAgeCondition = maxAge ? gte(users.dateOfBirth, yearsAgo(maxAge)) : undefined;
+
+  const condition = and(genderCondition, minAgeCondition, maxAgeCondition);
+
+  return db.select().from(users).where(condition).offset(offset).limit(limit);
   },
 
   getById: async (id: number) => {
