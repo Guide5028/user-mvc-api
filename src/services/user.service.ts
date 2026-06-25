@@ -1,4 +1,15 @@
-import { eq, gte, lte, and, inArray, or, ilike, asc, desc } from "drizzle-orm";
+import {
+  eq,
+  gte,
+  lte,
+  and,
+  inArray,
+  or,
+  ilike,
+  asc,
+  desc,
+  sql,
+} from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
@@ -22,6 +33,7 @@ function buildWhereClause(filters: UserFilters) {
         ilike(users.name, `%${filters.search}%`),
         ilike(users.surname, `%${filters.search}%`),
         ilike(users.email, `%${filters.search}%`),
+        sql`(${users.name} || ' ' || ${users.surname}) ILIKE ${`%${filters.search}%`}`,
       )
     : undefined;
   const genderCondition = filters.gender
