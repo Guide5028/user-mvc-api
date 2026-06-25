@@ -1,4 +1,4 @@
-import { eq, gte, lte, and, inArray, or, ilike, asc, desc} from "drizzle-orm";
+import { eq, gte, lte, and, inArray, or, ilike, asc, desc } from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
@@ -17,13 +17,33 @@ function yearsAgo(years: number): Date {
 }
 
 function buildWhereClause(filters: UserFilters) {
-  const searchCondition = filters.search ? or(ilike(users.name, `%${filters.search}%`), ilike(users.surname, `%${filters.search}%`), ilike(users.email, `%${filters.search}%`)) : undefined;
-  const genderCondition = filters.gender ? eq(users.gender, filters.gender) : undefined;
-  const minAgeCondition = filters.minAge ? lte(users.dateOfBirth, yearsAgo(filters.minAge)) : undefined;
-  const maxAgeCondition = filters.maxAge ? gte(users.dateOfBirth, yearsAgo(filters.maxAge)) : undefined;
-  const nationalityCondition = filters.nationalities ? inArray(users.nationality, filters.nationalities) : undefined;
+  const searchCondition = filters.search
+    ? or(
+        ilike(users.name, `%${filters.search}%`),
+        ilike(users.surname, `%${filters.search}%`),
+        ilike(users.email, `%${filters.search}%`),
+      )
+    : undefined;
+  const genderCondition = filters.gender
+    ? eq(users.gender, filters.gender)
+    : undefined;
+  const minAgeCondition = filters.minAge
+    ? lte(users.dateOfBirth, yearsAgo(filters.minAge))
+    : undefined;
+  const maxAgeCondition = filters.maxAge
+    ? gte(users.dateOfBirth, yearsAgo(filters.maxAge))
+    : undefined;
+  const nationalityCondition = filters.nationalities
+    ? inArray(users.nationality, filters.nationalities)
+    : undefined;
 
-  return and(searchCondition, genderCondition, minAgeCondition, maxAgeCondition, nationalityCondition);
+  return and(
+    searchCondition,
+    genderCondition,
+    minAgeCondition,
+    maxAgeCondition,
+    nationalityCondition,
+  );
 }
 
 const SORTABLE_COLUMNS = {
@@ -33,19 +53,36 @@ const SORTABLE_COLUMNS = {
 };
 
 function buildOrderByClause(sortBy?: string, order?: "asc" | "desc") {
-  if (sortBy === "age") { return order === "desc" ? asc(users.dateOfBirth) : desc(users.dateOfBirth); }
-  const column = sortBy && sortBy in SORTABLE_COLUMNS ? SORTABLE_COLUMNS[sortBy as keyof typeof SORTABLE_COLUMNS] : users.id;
+  if (sortBy === "age") {
+    return order === "desc" ? asc(users.dateOfBirth) : desc(users.dateOfBirth);
+  }
+  const column =
+    sortBy && sortBy in SORTABLE_COLUMNS
+      ? SORTABLE_COLUMNS[sortBy as keyof typeof SORTABLE_COLUMNS]
+      : users.id;
   return order === "desc" ? desc(column) : asc(column);
 }
 
 export const userService = {
-  getAll: (page: number, limit: number, filters: UserFilters, sortBy?: string, order?: "asc" | "desc") => {
-  const offset = (page - 1) * limit;
-  const condition = buildWhereClause(filters);
-  const orderBy = buildOrderByClause(sortBy, order);
+  getAll: (
+    page: number,
+    limit: number,
+    filters: UserFilters,
+    sortBy?: string,
+    order?: "asc" | "desc",
+  ) => {
+    const offset = (page - 1) * limit;
+    const condition = buildWhereClause(filters);
+    const orderBy = buildOrderByClause(sortBy, order);
 
-  return db.select().from(users).where(condition).offset(offset).limit(limit).orderBy(orderBy);
-},
+    return db
+      .select()
+      .from(users)
+      .where(condition)
+      .offset(offset)
+      .limit(limit)
+      .orderBy(orderBy);
+  },
 
   getById: async (id: number) => {
     const result = await db.select().from(users).where(eq(users.id, id));
@@ -70,6 +107,4 @@ export const userService = {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result[0] ?? null;
   },
-  
 };
-

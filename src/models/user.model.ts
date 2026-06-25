@@ -1,4 +1,11 @@
-import { pgTable, serial, varchar, integer, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  varchar,
+  integer,
+  pgEnum,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
