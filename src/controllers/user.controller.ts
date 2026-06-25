@@ -1,18 +1,29 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
-import { inArray } from "drizzle-orm";
+
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > dateOfBirth.getMonth() ||
+    (today.getMonth() === dateOfBirth.getMonth() && today.getDate() >= dateOfBirth.getDate());
+  if (!hasHadBirthdayThisYear) age--;
+  return age;
+}
 
 const VALID_GENDERS = ["male", "female", "other"];
 
 export const userController = {
-  getAll: async (req: FastifyRequest<{ Querystring: { page?: string; limit?: string; gender?: undefined | "male" | "female" | "other"; minAge?: string; maxAge?: string } }>, reply: FastifyReply) => {
+  getAll: async (req: FastifyRequest<{ Querystring: { page?: string; limit?: string; gender?: undefined | "male" | "female" | "other"; minAge?: string; maxAge?: string; nationalities?: string } }>, reply: FastifyReply) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const gender = req.query.gender && VALID_GENDERS.includes(req.query.gender) ? req.query.gender : undefined;
     const minAge = req.query.minAge ? Number(req.query.minAge) : undefined;
     const maxAge = req.query.maxAge ? Number(req.query.maxAge) : undefined;
-    const data = await userService.getAll(page, limit, gender, minAge, maxAge);
+    const nationalities = req.query.nationalities ? req.query.nationalities.split(",") : undefined;
+    const data = await userService.getAll(page, limit, gender, minAge, maxAge, nationalities);
     return reply.status(200).send(data);
+    
   },
 
   getById: async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -26,15 +37,15 @@ export const userController = {
 
   create: async (req: FastifyRequest, reply: FastifyReply) => {
     const body = req.body as Record<string, unknown>;
-    const { name, surname, age, gender, email } = body;
-
-    if (!name || !surname || !age || !gender || !email) {
+    const { name, surname, dateOfBirth, gender, email } = body;
+    const parsedDateOfBirth = new Date(dateOfBirth as string);
+    const age = dateOfBirth ? calculateAge(parsedDateOfBirth) : undefined;
+    if (!name || !surname || !dateOfBirth || !gender || !email) {
       return reply.status(400).send({
-        message: "name, surname, age, gender and email are required",
+        message: "name, surname, date of birth, gender and email are required",
       });
     }
-
-    const user = await userService.create(body as any);
+    const user = await userService.create({ ...body, age, dateOfBirth: parsedDateOfBirth } as any);
     return reply.status(201).send(user);
   },
 

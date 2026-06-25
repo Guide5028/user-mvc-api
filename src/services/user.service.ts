@@ -1,4 +1,4 @@
-import { eq, gte, lte, and } from "drizzle-orm";
+import { eq, gte, lte, and, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 
@@ -9,13 +9,16 @@ function yearsAgo(years: number): Date {
 }
 
 export const userService = {
-  getAll: (page: number, limit: number, gender?: "male" | "female" | "other", minAge?: number, maxAge?: number) => {
+  getAll: (page: number, limit: number, gender?: "male" | "female" | "other", minAge?: number, maxAge?: number, nationalities?: string[]) => {
     const offset = (page - 1) * limit;
   const genderCondition = gender ? eq(users.gender, gender) : undefined;
+  
   const minAgeCondition = minAge ? lte(users.dateOfBirth, yearsAgo(minAge)) : undefined;
   const maxAgeCondition = maxAge ? gte(users.dateOfBirth, yearsAgo(maxAge)) : undefined;
 
-  const condition = and(genderCondition, minAgeCondition, maxAgeCondition);
+  const nationalityCondition = nationalities ? inArray(users.nationality, nationalities) : undefined;
+  
+  const condition = and(genderCondition, minAgeCondition, maxAgeCondition, nationalityCondition);
 
   return db.select().from(users).where(condition).offset(offset).limit(limit);
   },
@@ -43,4 +46,6 @@ export const userService = {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result[0] ?? null;
   },
+  
 };
+
