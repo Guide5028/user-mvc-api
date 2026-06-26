@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
+import { sendSuccess, sendError } from "../utils/response";
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -52,7 +53,7 @@ export const userController = {
       sortBy,
       order,
     );
-    return reply.status(200).send(data);
+    return sendSuccess(reply, data);
   },
 
   getById: async (
@@ -62,9 +63,9 @@ export const userController = {
     const id = Number(req.params.id);
     const user = await userService.getById(id);
     if (!user) {
-      return reply.status(404).send({ message: "User not found" });
+      return sendError(reply, 404, "User not found");
     }
-    return reply.status(200).send(user);
+    return sendSuccess(reply, user);
   },
 
   create: async (req: FastifyRequest, reply: FastifyReply) => {
@@ -72,17 +73,29 @@ export const userController = {
     const { name, surname, dateOfBirth, gender, email } = body;
     const parsedDateOfBirth = new Date(dateOfBirth as string);
     const age = dateOfBirth ? calculateAge(parsedDateOfBirth) : undefined;
+
     if (!name || !surname || !dateOfBirth || !gender || !email) {
-      return reply.status(400).send({
-        message: "name, surname, date of birth, gender and email are required",
-      });
+      return sendError(
+        reply,
+        400,
+        "name, surname, date of birth, gender and email are required",
+      );
     }
+
+    if (!VALID_GENDERS.includes(gender as string)) {
+      return sendError(
+        reply,
+        400,
+        `gender must be one of: ${VALID_GENDERS.join(", ")}`,
+      );
+    }
+    
     const user = await userService.create({
       ...body,
       age,
       dateOfBirth: parsedDateOfBirth,
     } as any);
-    return reply.status(201).send(user);
+    return sendSuccess(reply, user, 201);
   },
 
   update: async (
@@ -92,10 +105,10 @@ export const userController = {
     const id = Number(req.params.id);
     const existing = await userService.getById(id);
     if (!existing) {
-      return reply.status(404).send({ message: "User not found" });
+      return sendError(reply, 404, "User not found");
     }
     const updated = await userService.update(id, req.body as any);
-    return reply.status(200).send(updated);
+    return sendSuccess(reply, updated);
   },
 
   remove: async (
@@ -105,7 +118,7 @@ export const userController = {
     const id = Number(req.params.id);
     const existing = await userService.getById(id);
     if (!existing) {
-      return reply.status(404).send({ message: "User not found" });
+      return sendError(reply, 404, "User not found");
     }
     await userService.remove(id);
     return reply.status(204).send();
