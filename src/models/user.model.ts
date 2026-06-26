@@ -5,6 +5,7 @@ import {
   integer,
   pgEnum,
   timestamp,
+  text,
 } from "drizzle-orm/pg-core";
 
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
@@ -22,6 +23,7 @@ export const users = pgTable("users", {
   address: varchar("address", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  avatarUrl: text("avatar_url"),
 });
 
 export type User = typeof users.$inferSelect;
