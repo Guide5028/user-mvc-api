@@ -6,8 +6,8 @@ import multipart from "@fastify/multipart";
 const app = Fastify({ logger: true });
 const PORT = Number(process.env.PORT) || 3002;
 
-app.register(userRoutes);
 app.register(multipart);
+app.register(userRoutes);
 
 app.listen({ port: PORT }, (err) => {
   if (err) {
