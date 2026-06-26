@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 import { sendSuccess, sendError } from "../utils/response";
-import { supabase } from "../storage/client";
+import { supabase, getSignedAvatarUrl } from "../storage/client";
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -15,6 +15,13 @@ function calculateAge(dateOfBirth: Date): number {
 }
 
 const VALID_GENDERS = ["male", "female", "other"];
+
+async function withSignedAvatar<T extends { avatarUrl: string | null }>(
+  user: T,
+) {
+  const signedUrl = await getSignedAvatarUrl(user.avatarUrl);
+  return { ...user, avatarUrl: signedUrl };
+}
 
 export const userController = {
   getAll: async (
@@ -66,7 +73,7 @@ export const userController = {
     if (!user) {
       return sendError(reply, 404, "User not found");
     }
-    return sendSuccess(reply, user);
+    return sendSuccess(reply, await withSignedAvatar(user));
   },
 
   create: async (req: FastifyRequest, reply: FastifyReply) => {
@@ -96,7 +103,7 @@ export const userController = {
       age,
       dateOfBirth: parsedDateOfBirth,
     } as any);
-    return sendSuccess(reply, user, 201);
+    return sendSuccess(reply, await withSignedAvatar(user), 201);
   },
 
   update: async (
@@ -109,7 +116,7 @@ export const userController = {
       return sendError(reply, 404, "User not found");
     }
     const updated = await userService.update(id, req.body as any);
-    return sendSuccess(reply, updated);
+    return sendSuccess(reply, await withSignedAvatar(updated));
   },
 
   remove: async (
@@ -149,13 +156,9 @@ export const userController = {
       return sendError(reply, 500, error.message);
     }
 
-    const { data: urlData } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(uploadData.path);
-
     const updated = await userService.update(id, {
-      avatarUrl: urlData.publicUrl,
+      avatarUrl: uploadData.path,
     });
-    return sendSuccess(reply, updated);
+    return sendSuccess(reply, await withSignedAvatar(updated));
   },
 };
