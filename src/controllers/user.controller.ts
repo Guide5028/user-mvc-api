@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 import { sendSuccess, sendError } from "../utils/response";
+import { supabase } from "../storage/client";
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -89,7 +90,7 @@ export const userController = {
         `gender must be one of: ${VALID_GENDERS.join(", ")}`,
       );
     }
-    
+
     const user = await userService.create({
       ...body,
       age,
@@ -122,5 +123,39 @@ export const userController = {
     }
     await userService.remove(id);
     return reply.status(204).send();
+  },
+
+  uploadAvatar: async (
+    req: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const id = Number(req.params.id);
+    const existing = await userService.getById(id);
+    if (!existing) {
+      return sendError(reply, 404, "User not found");
+    }
+
+    const data = await req.file();
+    if (!data) {
+      return sendError(reply, 400, "No file uploaded");
+    }
+    const buffer = await data.toBuffer();
+    const fileName = `user-${id}-${Date.now()}.jpg`;
+    const { data: uploadData, error } = await supabase.storage
+      .from("avatars") // which bucket?
+      .upload(fileName, buffer, { contentType: data.mimetype });
+
+    if (error) {
+      return sendError(reply, 500, error.message);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(uploadData.path);
+
+    const updated = await userService.update(id, {
+      avatarUrl: urlData.publicUrl,
+    });
+    return sendSuccess(reply, updated);
   },
 };
