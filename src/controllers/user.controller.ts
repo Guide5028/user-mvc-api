@@ -15,6 +15,11 @@ function calculateAge(dateOfBirth: Date): number {
 }
 
 const VALID_GENDERS = ["male", "female", "other"];
+const ALLOWED_AVATAR_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+};
 
 async function withSignedAvatar<T extends { avatarUrl: string | null }>(
   user: T,
@@ -138,8 +143,18 @@ export const userController = {
     }
 
     if (fileBuffer) {
+      const extension = fileMimetype
+        ? ALLOWED_AVATAR_TYPES[fileMimetype]
+        : undefined;
+      if (!extension) {
+        return sendError(
+          reply,
+          400,
+          "Avatar must be a JPEG, PNG, or GIF image",
+        );
+      }
       await deleteAvatar(existing.avatarUrl);
-      const fileName = `user-${id}-${Date.now()}.jpg`;
+      const fileName = `user-${id}-${Date.now()}.${extension}`;
       const { data: uploadData, error } = await supabase.storage
         .from("avatars")
         .upload(fileName, fileBuffer, { contentType: fileMimetype });

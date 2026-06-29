@@ -6,7 +6,13 @@ import multipart from "@fastify/multipart";
 const app = Fastify({ logger: true });
 const PORT = Number(process.env.PORT) || 3002;
 
-app.register(multipart);
+//size limit for file uploads (5 MB)
+app.register(multipart, {
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
 app.register(userRoutes);
 
 app.listen({ port: PORT }, (err) => {
