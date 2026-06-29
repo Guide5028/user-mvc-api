@@ -18,4 +18,9 @@ export async function getSignedAvatarUrl(
   return data.signedUrl;
 }
 
+export async function deleteAvatar(path: string | null) {
+  if (!path) return;
+  await supabase.storage.from("avatars").remove([path]);
+}
+
 export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);

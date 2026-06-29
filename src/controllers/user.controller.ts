@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 import { sendSuccess, sendError } from "../utils/response";
-import { supabase, getSignedAvatarUrl } from "../storage/client";
+import { supabase, getSignedAvatarUrl, deleteAvatar } from "../storage/client";
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -61,7 +61,8 @@ export const userController = {
       sortBy,
       order,
     );
-    return sendSuccess(reply, data);
+    const usersWithAvatars = await Promise.all(data.map(withSignedAvatar));
+    return sendSuccess(reply, usersWithAvatars);
   },
 
   getById: async (
@@ -115,7 +116,43 @@ export const userController = {
     if (!existing) {
       return sendError(reply, 404, "User not found");
     }
-    const updated = await userService.update(id, req.body as any);
+
+    const fields: Record<string, unknown> = {};
+    let fileBuffer: Buffer | undefined;
+    let fileMimetype: string | undefined;
+
+    for await (const part of req.parts()) {
+      if (part.type === "file") {
+        fileBuffer = await part.toBuffer();
+        fileMimetype = part.mimetype;
+      } else {
+        fields[part.fieldname] = part.value;
+      }
+    }
+
+    let avatarUrl = existing.avatarUrl;
+
+    if (fields.removeAvatar === "true") {
+      await deleteAvatar(existing.avatarUrl);
+      avatarUrl = null;
+    }
+
+    if (fileBuffer) {
+      await deleteAvatar(existing.avatarUrl);
+      const fileName = `user-${id}-${Date.now()}.jpg`;
+      const { data: uploadData, error } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, fileBuffer, { contentType: fileMimetype });
+      if (error) {
+        return sendError(reply, 500, error.message);
+      }
+      avatarUrl = uploadData.path;
+    }
+
+    const updated = await userService.update(id, {
+      ...fields,
+      avatarUrl,
+    } as any);
     return sendSuccess(reply, await withSignedAvatar(updated));
   },
 
@@ -132,7 +169,7 @@ export const userController = {
     return reply.status(204).send();
   },
 
-  uploadAvatar: async (
+  deleteAvatarOnly: async (
     req: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
   ) => {
@@ -141,24 +178,8 @@ export const userController = {
     if (!existing) {
       return sendError(reply, 404, "User not found");
     }
-
-    const data = await req.file();
-    if (!data) {
-      return sendError(reply, 400, "No file uploaded");
-    }
-    const buffer = await data.toBuffer();
-    const fileName = `user-${id}-${Date.now()}.jpg`;
-    const { data: uploadData, error } = await supabase.storage
-      .from("avatars") // which bucket?
-      .upload(fileName, buffer, { contentType: data.mimetype });
-
-    if (error) {
-      return sendError(reply, 500, error.message);
-    }
-
-    const updated = await userService.update(id, {
-      avatarUrl: uploadData.path,
-    });
+    await deleteAvatar(existing.avatarUrl);
+    const updated = await userService.update(id, { avatarUrl: null } as any);
     return sendSuccess(reply, await withSignedAvatar(updated));
   },
 };
