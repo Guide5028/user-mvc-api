@@ -13,7 +13,7 @@ import {
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 import bcrypt from "bcrypt";
-import { signAccessToken, signRefreshToken } from "../utils/jwt";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 
 interface UserFilters {
   gender?: "male" | "female" | "other";
@@ -153,6 +153,15 @@ export const userService = {
     return { user: safeUser, accessToken, refreshToken };
   },
 
+  refresh: (refreshToken: string) => {
+    const payload = verifyRefreshToken(refreshToken);
+    const newAccessToken = signAccessToken({
+      userId: payload.userId,
+      email: payload.email,
+    });
+    return { accessToken: newAccessToken };
+  },
+  
   update: async (id: number, data: Partial<NewUser>) => {
     const result = await db
       .update(users)
