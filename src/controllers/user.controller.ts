@@ -82,6 +82,60 @@ export const userController = {
     return sendSuccess(reply, await withSignedAvatar(user));
   },
 
+  register: async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = req.body as Record<string, unknown>;
+    const { name, surname, dateOfBirth, gender, email, password } = body;
+
+    if (!name || !surname || !dateOfBirth || !gender || !email || !password) {
+      return sendError(
+        reply,
+        400,
+        "name, surname, date of birth, gender, email and password are required",
+      );
+    }
+
+    if (!VALID_GENDERS.includes(gender as string)) {
+      return sendError(
+        reply,
+        400,
+        `gender must be one of: ${VALID_GENDERS.join(", ")}`,
+      );
+    }
+
+    const parsedDateOfBirth = new Date(dateOfBirth as string);
+    const age = calculateAge(parsedDateOfBirth);
+
+    try {
+      const user = await userService.register({
+        ...body,
+        age,
+        dateOfBirth: parsedDateOfBirth,
+      } as any);
+      return sendSuccess(reply, user, 201);
+    } catch (err) {
+      return sendError(reply, 409, (err as Error).message);
+    }
+  },
+
+  login: async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = req.body as Record<string, unknown>;
+    const { email, password } = body;
+
+    if (!email || !password) {
+      return sendError(reply, 400, "email and password are required");
+    }
+
+    try {
+      const result = await userService.login(
+        email as string,
+        password as string,
+      );
+      return sendSuccess(reply, result, 200);
+    } catch (err) {
+      return sendError(reply, 401, (err as Error).message);
+    }
+  },
+
   create: async (req: FastifyRequest, reply: FastifyReply) => {
     const body = req.body as Record<string, unknown>;
     const { name, surname, dateOfBirth, gender, email } = body;

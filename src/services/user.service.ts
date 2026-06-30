@@ -13,6 +13,8 @@ import {
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 import bcrypt from "bcrypt";
+import { signAccessToken, signRefreshToken } from "../utils/jwt";
+
 interface UserFilters {
   gender?: "male" | "female" | "other";
   minAge?: number;
@@ -142,8 +144,13 @@ export const userService = {
       throw new Error("Invalid email or password");
     }
 
+    // Sign tokens after password is verified
+    const payload = { userId: user.id, email: user.email };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+
     const { passwordHash: _, ...safeUser } = user;
-    return safeUser;
+    return { user: safeUser, accessToken, refreshToken };
   },
 
   update: async (id: number, data: Partial<NewUser>) => {

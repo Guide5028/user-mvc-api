@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1782211274723,
-      "tag": "0000_tense_roxanne_simpson",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1782355201748,
-      "tag": "0001_magenta_the_call",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1782360280805,
-      "tag": "0002_concerned_dormammu",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1782454823910,
-      "tag": "0003_third_toad",
+      "when": 1782806771887,
+      "tag": "0000_next_purifiers",
       "breakpoints": true
     }
   ]

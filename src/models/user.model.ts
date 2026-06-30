@@ -20,7 +20,7 @@ export const users = pgTable("users", {
   nationality: varchar("nationality", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
 
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),
   provider : varchar("provider", { length: 50 }).notNull().default("local"),
   providerId : varchar("provider_id", { length: 255 }),
 
