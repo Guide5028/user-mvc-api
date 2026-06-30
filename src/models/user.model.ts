@@ -19,6 +19,11 @@ export const users = pgTable("users", {
   gender: genderEnum("gender").notNull(),
   nationality: varchar("nationality", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
+
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  provider : varchar("provider", { length: 50 }).notNull().default("local"),
+  providerId : varchar("provider_id", { length: 255 }),
+
   phoneNumber: varchar("phone_number", { length: 20 }),
   address: varchar("address", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm";
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
-
+import bcrypt from "bcrypt";
 interface UserFilters {
   gender?: "male" | "female" | "other";
   minAge?: number;
@@ -104,6 +104,46 @@ export const userService = {
   create: async (data: NewUser) => {
     const result = await db.insert(users).values(data).returning();
     return result[0];
+  },
+
+  register: async (data: NewUser & { password: string }) => {
+    // check existed email
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, data.email));
+    if (existingUser.length > 0) {
+      throw new Error("Email already registered");
+    }
+
+    //Hash the password before storing it in the database
+    const { password, ...rest } = data;
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    // Insert with password hash and provider set to "local"
+    const result = await db
+      .insert(users)
+      .values({ ...rest, passwordHash, provider: "local" })
+      .returning();
+
+    const { passwordHash: _, ...safeUser } = result[0]; // Exclude passwordHash from the returned user object
+    return safeUser;
+  },
+
+  login: async (email: string, password: string) => {
+    const result = await db.select().from(users).where(eq(users.email, email));
+    const user = result[0];
+    if (!user || !user.passwordHash) {
+      throw new Error("Invalid email or password");
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      throw new Error("Invalid email or password");
+    }
+
+    const { passwordHash: _, ...safeUser } = user;
+    return safeUser;
   },
 
   update: async (id: number, data: Partial<NewUser>) => {
