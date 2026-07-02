@@ -27,6 +27,11 @@ export async function userRoutes(app: FastifyInstance) {
   app.post("/users/register", userController.register);
   app.post("/users/login", userController.login);
   app.post("/users/refresh", userController.refresh);
+  app.post(
+    "/users/logout",
+    { preHandler: authenticate },
+    userController.logout,
+  );
 
   app.put<{ Params: { id: string } }>(
     "/users/:id",

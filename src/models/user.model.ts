@@ -21,14 +21,24 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
 
   passwordHash: varchar("password_hash", { length: 255 }),
-  provider : varchar("provider", { length: 50 }).notNull().default("local"),
-  providerId : varchar("provider_id", { length: 255 }),
+  provider: varchar("provider", { length: 50 }).notNull().default("local"),
+  providerId: varchar("provider_id", { length: 255 }),
 
   phoneNumber: varchar("phone_number", { length: 20 }),
   address: varchar("address", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   avatarUrl: text("avatar_url"),
+});
+
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
 });
 
 export type User = typeof users.$inferSelect;

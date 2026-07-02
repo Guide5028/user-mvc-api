@@ -13,8 +13,12 @@ import {
 import { db } from "../db/client";
 import { users, NewUser } from "../models/user.model";
 import bcrypt from "bcrypt";
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
-
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt";
+import { refreshTokens } from "../models/user.model";
 interface UserFilters {
   gender?: "male" | "female" | "other";
   minAge?: number;
@@ -149,19 +153,71 @@ export const userService = {
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
+    // Store the refresh token in the database with an expiration date
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await db.insert(refreshTokens).values({
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+    });
+
     const { passwordHash: _, ...safeUser } = user;
     return { user: safeUser, accessToken, refreshToken };
   },
 
-  refresh: (refreshToken: string) => {
+  refresh: async (refreshToken: string) => {
+    const existingToken = await db
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.token, refreshToken));
+
+    if (existingToken.length === 0) {
+      throw new Error("Refresh token not found");
+    }
+
+    const tokenData = existingToken[0];
+    if (new Date(tokenData.expiresAt) < new Date()) {
+      throw new Error("Refresh token has expired");
+    }
     const payload = verifyRefreshToken(refreshToken);
+
+    // 1. Kill the old refresh token — it's about to be replaced.
+    await db.delete(refreshTokens).where(eq(refreshTokens.token, refreshToken));
+
+    // 2. Mint a fresh refresh token, same as login() does.
+    const newRefreshToken = signRefreshToken({
+      userId: payload.userId,
+      email: payload.email,
+    });
+
+    // 3. Store it, with a new 7-day expiry, same shape as login().
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await db.insert(refreshTokens).values({
+      userId: payload.userId,
+      token: newRefreshToken,
+      expiresAt,
+    });
     const newAccessToken = signAccessToken({
       userId: payload.userId,
       email: payload.email,
     });
-    return { accessToken: newAccessToken };
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   },
-  
+
+  logout: async (refreshToken: string) => {
+    const deleted = await db
+      .delete(refreshTokens)
+      .where(eq(refreshTokens.token, refreshToken))
+      .returning();
+
+    if (deleted.length === 0) {
+      throw new Error("Refresh token not found");
+    }
+  },
+
   update: async (id: number, data: Partial<NewUser>) => {
     const result = await db
       .update(users)

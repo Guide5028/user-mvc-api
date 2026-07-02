@@ -140,18 +140,35 @@ export const userController = {
     const body = req.body as Record<string, unknown>;
     const { refreshToken } = body;
 
+
     if (!refreshToken) {
       return sendError(reply, 400, "refreshToken is required");
     }
 
     try {
-      const result = userService.refresh(refreshToken as string);
+      const result = await userService.refresh(refreshToken as string);
       return sendSuccess(reply, result, 200);
     } catch (err) {
       return sendError(reply, 401, "Invalid or expired refresh token");
     }
   },
-  
+
+  logout: async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = req.body as Record<string, unknown>;
+    const { refreshToken } = body;
+
+    if (!refreshToken) {
+      return sendError(reply, 400, "refreshToken is required");
+    }
+
+    try {
+      await userService.logout(refreshToken as string);
+      return sendSuccess(reply, { message: "Logged out successfully" }, 200);
+    } catch (err) {
+      return sendError(reply, 401, (err as Error).message);
+    }
+  },
+
   create: async (req: FastifyRequest, reply: FastifyReply) => {
     const body = req.body as Record<string, unknown>;
     const { name, surname, dateOfBirth, gender, email } = body;
