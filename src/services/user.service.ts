@@ -82,7 +82,7 @@ function buildOrderByClause(sortBy?: string, order?: "asc" | "desc") {
 }
 
 export const userService = {
-  getAll: (
+  getAll: async (
     page: number,
     limit: number,
     filters: UserFilters,
@@ -93,18 +93,22 @@ export const userService = {
     const condition = buildWhereClause(filters);
     const orderBy = buildOrderByClause(sortBy, order);
 
-    return db
+    const result = await db
       .select()
       .from(users)
       .where(condition)
       .offset(offset)
       .limit(limit)
       .orderBy(orderBy);
+
+    return result.map(({ passwordHash, ...safeUser }) => safeUser);
   },
 
   getById: async (id: number) => {
     const result = await db.select().from(users).where(eq(users.id, id));
-    return result[0] ?? null;
+    if (!result[0]) return null;
+    const { passwordHash, ...safeUser } = result[0];
+    return safeUser;
   },
 
   create: async (data: NewUser) => {

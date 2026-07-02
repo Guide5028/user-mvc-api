@@ -2,6 +2,11 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { supabase, getSignedAvatarUrl, deleteAvatar } from "../storage/client";
+import {
+  registerSchema,
+  refreshTokenSchema,
+  loginSchema,
+} from "../schemas/auth.schemas";
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -83,33 +88,20 @@ export const userController = {
   },
 
   register: async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as Record<string, unknown>;
-    const { name, surname, dateOfBirth, gender, email, password } = body;
-
-    if (!name || !surname || !dateOfBirth || !gender || !email || !password) {
-      return sendError(
-        reply,
-        400,
-        "name, surname, date of birth, gender, email and password are required",
-      );
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
     }
 
-    if (!VALID_GENDERS.includes(gender as string)) {
-      return sendError(
-        reply,
-        400,
-        `gender must be one of: ${VALID_GENDERS.join(", ")}`,
-      );
-    }
-
-    const parsedDateOfBirth = new Date(dateOfBirth as string);
+    const { dateOfBirth, ...rest } = parsed.data;
+    const parsedDateOfBirth = new Date(dateOfBirth);
     const age = calculateAge(parsedDateOfBirth);
 
     try {
       const user = await userService.register({
-        ...body,
-        age,
+        ...rest,
         dateOfBirth: parsedDateOfBirth,
+        age,
       } as any);
       return sendSuccess(reply, user, 201);
     } catch (err) {
@@ -118,12 +110,11 @@ export const userController = {
   },
 
   login: async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as Record<string, unknown>;
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return sendError(reply, 400, "email and password are required");
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
     }
+    const { email, password } = parsed.data;
 
     try {
       const result = await userService.login(
@@ -137,13 +128,11 @@ export const userController = {
   },
 
   refresh: async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as Record<string, unknown>;
-    const { refreshToken } = body;
-
-
-    if (!refreshToken) {
-      return sendError(reply, 400, "refreshToken is required");
+    const parsed = refreshTokenSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
     }
+    const { refreshToken } = parsed.data;
 
     try {
       const result = await userService.refresh(refreshToken as string);
@@ -154,12 +143,11 @@ export const userController = {
   },
 
   logout: async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as Record<string, unknown>;
-    const { refreshToken } = body;
-
-    if (!refreshToken) {
-      return sendError(reply, 400, "refreshToken is required");
+    const parsed = refreshTokenSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
     }
+    const { refreshToken } = parsed.data;
 
     try {
       await userService.logout(refreshToken as string);
