@@ -1,6 +1,9 @@
 import { FastifyRequest, FastifyReply, preHandlerHookHandler } from "fastify";
 import { verifyAccessToken } from "../utils/jwt";
 import { sendError } from "../utils/response";
+import { db } from "../db/client";
+import { refreshTokens } from "../models/user.model";
+import { eq } from "drizzle-orm";
 
 export const authenticate: preHandlerHookHandler = async (req, reply) => {
   const authHeader = req.headers.authorization;
@@ -11,12 +14,26 @@ export const authenticate: preHandlerHookHandler = async (req, reply) => {
 
   const token = authHeader.split(" ")[1];
 
+  let payload;
   try {
-    const payload = verifyAccessToken(token);
-    req.user = payload;
+    payload = verifyAccessToken(token);
   } catch (err) {
     return sendError(reply, 401, "Invalid or expired token");
   }
+
+  // The signature/expiry check above only proves the token is authentic.
+  // This DB check proves the session it belongs to hasn't been revoked
+  // (i.e. killed by a later refresh() or logout()).
+  const session = await db
+    .select()
+    .from(refreshTokens)
+    .where(eq(refreshTokens.sessionId, payload.sessionId));
+
+  if (session.length === 0) {
+    return sendError(reply, 401, "Session has been revoked");
+  }
+
+  req.user = payload;
 };
 
 export function requireRole(allowedRoles: string[]): preHandlerHookHandler {

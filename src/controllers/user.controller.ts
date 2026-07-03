@@ -157,15 +157,6 @@ export const userController = {
     }
   },
 
-  logoutAll: async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await userService.logoutAll(req.user!.userId);
-      return sendSuccess(reply, { message: "Logged out from all sessions" }, 200);
-    } catch (err) {
-      return sendError(reply, 500, (err as Error).message);
-    }
-  },
-
   create: async (req: FastifyRequest, reply: FastifyReply) => {
     const body = req.body as Record<string, unknown>;
     const { name, surname, dateOfBirth, gender, email } = body;

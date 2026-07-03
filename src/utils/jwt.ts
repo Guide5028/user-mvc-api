@@ -11,6 +11,7 @@ export interface TokenPayload {
   userId: number;
   email: string;
   role: "admin" | "cashier" | "manager";
+  sessionId: string;
 }
 
 export function signAccessToken(payload: TokenPayload) {

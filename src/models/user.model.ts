@@ -39,6 +39,17 @@ export const refreshTokens = pgTable("refresh_tokens", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
+  sessionId: text("session_id").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const resetpasswordTokens = pgTable("reset_password_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
 });

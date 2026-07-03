@@ -152,8 +152,9 @@ export const userService = {
       throw new Error("Invalid email or password");
     }
 
+    const sessionId = crypto.randomUUID().toString(); // Generate a unique session ID for the refresh token
     // Sign tokens after password is verified
-    const payload = { userId: user.id, email: user.email, role: user.role };
+    const payload = { userId: user.id, email: user.email, role: user.role, sessionId };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
@@ -164,6 +165,7 @@ export const userService = {
     await db.insert(refreshTokens).values({
       userId: user.id,
       token: refreshToken,
+      sessionId,
       expiresAt,
     });
 
@@ -190,11 +192,16 @@ export const userService = {
     // 1. Kill the old refresh token — it's about to be replaced.
     await db.delete(refreshTokens).where(eq(refreshTokens.token, refreshToken));
 
+    // 1b. New session identity — this is what makes the OLD access token
+    // die immediately, since its sessionId will no longer exist anywhere.
+    const newSessionId = crypto.randomUUID();
+
     // 2. Mint a fresh refresh token, same as login() does.
     const newRefreshToken = signRefreshToken({
       userId: payload.userId,
       email: payload.email,
       role: payload.role,
+      sessionId: newSessionId,
     });
 
     // 3. Store it, with a new 7-day expiry, same shape as login().
@@ -203,12 +210,14 @@ export const userService = {
     await db.insert(refreshTokens).values({
       userId: payload.userId,
       token: newRefreshToken,
+      sessionId: newSessionId,
       expiresAt,
     });
     const newAccessToken = signAccessToken({
       userId: payload.userId,
       email: payload.email,
       role: payload.role,
+      sessionId: newSessionId,
     });
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   },
@@ -222,10 +231,6 @@ export const userService = {
     if (deleted.length === 0) {
       throw new Error("Refresh token not found");
     }
-  },
-
-  logoutAll: async (userId: number) => {
-    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
   },
 
   update: async (id: number, data: Partial<NewUser>) => {
