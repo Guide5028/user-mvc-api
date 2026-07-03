@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { userController } from "../controllers/user.controller";
-import { authenticate } from "../middleware/auth.middleware";
+import { authenticate, requireRole} from "../middleware/auth.middleware";
 
 export async function userRoutes(app: FastifyInstance) {
   app.get<{
@@ -23,7 +23,12 @@ export async function userRoutes(app: FastifyInstance) {
     userController.getById,
   );
 
-  app.post("/users", userController.create);
+  app.post(
+    "/users",
+    { preHandler: [authenticate, requireRole(["admin"])] },
+    userController.create,
+  );
+  
   app.post("/users/register", userController.register);
   app.post("/users/login", userController.login);
   app.post("/users/refresh", userController.refresh);
@@ -41,7 +46,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>(
     "/users/:id",
-    { preHandler: authenticate },
+    { preHandler: [authenticate, requireRole(["admin"])] },
     userController.remove,
   );
 

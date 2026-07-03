@@ -18,3 +18,11 @@ export const authenticate: preHandlerHookHandler = async (req, reply) => {
     return sendError(reply, 401, "Invalid or expired token");
   }
 };
+
+export function requireRole(allowedRoles: string[]): preHandlerHookHandler {
+  return async (req, reply) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return sendError(reply, 403, "Forbidden: Insufficient role");
+    }
+  };
+} 
