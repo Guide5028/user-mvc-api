@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
+export const roleEnum = pgEnum("role", ["admin", "cashier", "manager"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -19,6 +20,7 @@ export const users = pgTable("users", {
   gender: genderEnum("gender").notNull(),
   nationality: varchar("nationality", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  role: roleEnum("role").notNull().default("cashier"),
 
   passwordHash: varchar("password_hash", { length: 255 }),
   provider: varchar("provider", { length: 50 }).notNull().default("local"),

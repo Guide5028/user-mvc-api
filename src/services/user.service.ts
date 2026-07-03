@@ -153,7 +153,7 @@ export const userService = {
     }
 
     // Sign tokens after password is verified
-    const payload = { userId: user.id, email: user.email };
+    const payload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
@@ -194,6 +194,7 @@ export const userService = {
     const newRefreshToken = signRefreshToken({
       userId: payload.userId,
       email: payload.email,
+      role: payload.role,
     });
 
     // 3. Store it, with a new 7-day expiry, same shape as login().
@@ -207,6 +208,7 @@ export const userService = {
     const newAccessToken = signAccessToken({
       userId: payload.userId,
       email: payload.email,
+      role: payload.role,
     });
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   },
