@@ -224,6 +224,10 @@ export const userService = {
     }
   },
 
+  logoutAll: async (userId: number) => {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+  },
+
   update: async (id: number, data: Partial<NewUser>) => {
     const result = await db
       .update(users)
