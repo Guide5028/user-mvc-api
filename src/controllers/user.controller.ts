@@ -2,11 +2,16 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { userService } from "../services/user.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { supabase, getSignedAvatarUrl, deleteAvatar } from "../storage/client";
+import { OAuth2Client } from "google-auth-library";
 import {
   registerSchema,
   refreshTokenSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../schemas/auth.schemas";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function calculateAge(dateOfBirth: Date): number {
   const today = new Date();
@@ -271,5 +276,171 @@ export const userController = {
     await deleteAvatar(existing.avatarUrl);
     const updated = await userService.update(id, { avatarUrl: null } as any);
     return sendSuccess(reply, await withSignedAvatar(updated));
+  },
+
+  forgotPassword: async (req: FastifyRequest, reply: FastifyReply) => {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
+    }
+
+    const token = await userService.requestPasswordReset(parsed.data.email);
+
+    return sendSuccess(
+      reply,
+      {
+        message: "If that email exists, a reset link has been sent.",
+        // TEMPORARY — for testing only, remove once real email sending exists.
+        ...(token ? { token } : {}),
+      },
+      200,
+    );
+  },
+
+  resetPassword: async (req: FastifyRequest, reply: FastifyReply) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, parsed.error.issues[0].message);
+    }
+
+    try {
+      await userService.resetPassword(parsed.data.token, parsed.data.newPassword);
+      return sendSuccess(reply, { message: "Password has been reset" }, 200);
+    } catch (err) {
+      return sendError(reply, 400, (err as Error).message);
+    }
+  },
+
+  redirectToGoogle: async (req: FastifyRequest, reply: FastifyReply) => {
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+      response_type: "code",
+      scope: "openid email profile",
+    });
+    return reply.redirect(
+      `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    );
+  },
+
+  redirectToFacebook: async (req: FastifyRequest, reply: FastifyReply) => {
+    const params = new URLSearchParams({
+      client_id: process.env.FACEBOOK_APP_ID!,
+      redirect_uri: process.env.FACEBOOK_REDIRECT_URI!,
+      response_type: "code",
+      scope: "email,public_profile",
+    });
+    return reply.redirect(
+      `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`,
+    );
+  },
+
+  googleCallback: async (
+    req: FastifyRequest<{ Querystring: { code?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const { code } = req.query;
+    if (!code) {
+      return sendError(reply, 400, "Missing authorization code");
+    }
+
+    try {
+      // 1. Exchange the one-time code for Google's tokens (server-to-server).
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+          grant_type: "authorization_code",
+        }),
+      });
+      const tokenData = (await tokenResponse.json()) as { id_token?: string };
+
+      if (!tokenData.id_token) {
+        return sendError(reply, 401, "Google did not return an id_token");
+      }
+
+      // 2. Verify the id_token's signature — never trust it unverified.
+      const ticket = await googleClient.verifyIdToken({
+        idToken: tokenData.id_token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+
+      if (!payload?.email || !payload.sub) {
+        return sendError(reply, 401, "Could not verify Google identity");
+      }
+
+      // 3. Find-or-create the user and issue our own tokens.
+      const result = await userService.findOrCreateSocialUser(
+        "google",
+        payload.sub,
+        payload.email,
+        payload.name || payload.email,
+      );
+
+      return sendSuccess(reply, result, 200);
+    } catch (err) {
+      return sendError(reply, 401, "Google authentication failed");
+    }
+  },
+
+  facebookCallback: async (
+    req: FastifyRequest<{ Querystring: { code?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const { code } = req.query;
+    if (!code) {
+      return sendError(reply, 400, "Missing authorization code");
+    }
+
+    try {
+      // 1. Exchange the code for an access_token.
+      const tokenParams = new URLSearchParams({
+        client_id: process.env.FACEBOOK_APP_ID!,
+        client_secret: process.env.FACEBOOK_APP_SECRET!,
+        redirect_uri: process.env.FACEBOOK_REDIRECT_URI!,
+        code,
+      });
+      const tokenResponse = await fetch(
+        `https://graph.facebook.com/v19.0/oauth/access_token?${tokenParams.toString()}`,
+      );
+      const tokenData = (await tokenResponse.json()) as {
+        access_token?: string;
+      };
+
+      if (!tokenData.access_token) {
+        return sendError(reply, 401, "Facebook did not return an access_token");
+      }
+
+      // 2. Facebook has no id_token (not OIDC) — fetch the profile via Graph API instead.
+      const profileResponse = await fetch(
+        `https://graph.facebook.com/me?fields=id,name,email&access_token=${tokenData.access_token}`,
+      );
+      const profile = (await profileResponse.json()) as {
+        id?: string;
+        name?: string;
+        email?: string;
+      };
+
+      if (!profile.id || !profile.email) {
+        return sendError(reply, 401, "Could not retrieve Facebook profile");
+      }
+
+      // 3. Same shared logic as Google.
+      const result = await userService.findOrCreateSocialUser(
+        "facebook",
+        profile.id,
+        profile.email,
+        profile.name || profile.email,
+      );
+
+      return sendSuccess(reply, result, 200);
+    } catch (err) {
+      return sendError(reply, 401, "Facebook authentication failed");
+    }
   },
 };

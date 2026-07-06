@@ -16,8 +16,8 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 100 }).notNull(),
   surname: varchar("surname", { length: 100 }).notNull(),
   age: integer("age"),
-  dateOfBirth: timestamp("date_of_birth").notNull(),
-  gender: genderEnum("gender").notNull(),
+  dateOfBirth: timestamp("date_of_birth"),
+  gender: genderEnum("gender"),
   nationality: varchar("nationality", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
   role: roleEnum("role").notNull().default("cashier"),
@@ -49,10 +49,12 @@ export const resetpasswordTokens = pgTable("reset_password_tokens", {
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  token: text("token").notNull(),
+  token: text("token").notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
 });
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type ResetPasswordToken = typeof resetpasswordTokens.$inferSelect;
+export type NewResetPasswordToken = typeof resetpasswordTokens.$inferInsert;

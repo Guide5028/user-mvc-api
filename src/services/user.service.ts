@@ -11,7 +11,12 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "../db/client";
-import { users, NewUser } from "../models/user.model";
+import {
+  users,
+  NewUser,
+  resetpasswordTokens,
+  NewResetPasswordToken,
+} from "../models/user.model";
 import bcrypt from "bcrypt";
 import {
   signAccessToken,
@@ -154,7 +159,12 @@ export const userService = {
 
     const sessionId = crypto.randomUUID().toString(); // Generate a unique session ID for the refresh token
     // Sign tokens after password is verified
-    const payload = { userId: user.id, email: user.email, role: user.role, sessionId };
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId,
+    };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
@@ -245,5 +255,116 @@ export const userService = {
   remove: async (id: number) => {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result[0] ?? null;
+  },
+
+  requestPasswordReset: async (email: string) => {
+    const result = await db.select().from(users).where(eq(users.email, email));
+    const user = result[0];
+
+    if (!user) {
+      return null; // Do not reveal whether the email exists in the system for security reasons
+    }
+
+    const token = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    await db.insert(resetpasswordTokens).values({
+      userId: user.id,
+      token,
+      expiresAt,
+    });
+
+    return token;
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    const result = await db
+      .select()
+      .from(resetpasswordTokens)
+      .where(eq(resetpasswordTokens.token, token));
+
+    const resetRecord = result[0];
+    if (!resetRecord || new Date(resetRecord.expiresAt) < new Date()) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, resetRecord.userId));
+
+    await db
+      .delete(resetpasswordTokens)
+      .where(eq(resetpasswordTokens.token, token));
+  },
+
+  // Shared by both Google and Facebook callbacks: find an existing user for
+  // this provider, or link/create one, then issue our own access/refresh
+  // tokens exactly like login() does.
+  findOrCreateSocialUser: async (
+    provider: "google" | "facebook",
+    providerId: string,
+    email: string,
+    name: string,
+  ) => {
+    const byProvider = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.provider, provider), eq(users.providerId, providerId)));
+
+    let user = byProvider[0];
+
+    if (!user) {
+      // Not linked yet — if an account with this email already exists
+      // (e.g. registered locally before), link this provider to it instead
+      // of creating a duplicate.
+      const byEmail = await db.select().from(users).where(eq(users.email, email));
+
+      if (byEmail[0]) {
+        const updated = await db
+          .update(users)
+          .set({ provider, providerId })
+          .where(eq(users.id, byEmail[0].id))
+          .returning();
+        user = updated[0];
+      } else {
+        const [first, ...rest] = name.split(" ");
+        const inserted = await db
+          .insert(users)
+          .values({
+            name: first || name,
+            surname: rest.join(" ") || "-",
+            email,
+            provider,
+            providerId,
+          } as NewUser)
+          .returning();
+        user = inserted[0];
+      }
+    }
+
+    const sessionId = crypto.randomUUID();
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId,
+    };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await db.insert(refreshTokens).values({
+      userId: user.id,
+      token: refreshToken,
+      sessionId,
+      expiresAt,
+    });
+
+    const { passwordHash: _, ...safeUser } = user;
+    return { user: safeUser, accessToken, refreshToken };
   },
 };

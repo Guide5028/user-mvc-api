@@ -37,7 +37,19 @@ export async function userRoutes(app: FastifyInstance) {
     { preHandler: authenticate },
     userController.logout,
   );
+  app.post("/users/forgot-password", userController.forgotPassword);
+  app.post("/users/reset-password", userController.resetPassword);
 
+  app.get("/auth/google", userController.redirectToGoogle);
+  app.get("/auth/facebook", userController.redirectToFacebook);
+  app.get<{ Querystring: { code?: string } }>(
+    "/auth/google/callback",
+    userController.googleCallback,
+  );
+  app.get<{ Querystring: { code?: string } }>(
+    "/auth/facebook/callback",
+    userController.facebookCallback,
+  );
   app.put<{ Params: { id: string } }>(
     "/users/:id",
     { preHandler: authenticate },
