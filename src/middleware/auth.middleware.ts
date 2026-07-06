@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply, preHandlerHookHandler } from "fastify";
+import { preHandlerHookHandler } from "fastify";
 import { verifyAccessToken } from "../utils/jwt";
 import { sendError } from "../utils/response";
 import { db } from "../db/client";
@@ -10,7 +10,7 @@ export const authenticate: preHandlerHookHandler = async (req, reply) => {
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return sendError(reply, 401, "Missing or invalid Authorization header");
-  }
+  } 
 
   const token = authHeader.split(" ")[1];
 
@@ -21,9 +21,7 @@ export const authenticate: preHandlerHookHandler = async (req, reply) => {
     return sendError(reply, 401, "Invalid or expired token");
   }
 
-  // The signature/expiry check above only proves the token is authentic.
-  // This DB check proves the session it belongs to hasn't been revoked
-  // (i.e. killed by a later refresh() or logout()).
+  // Check if the session is still valid in the database
   const session = await db
     .select()
     .from(refreshTokens)
