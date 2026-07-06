@@ -382,7 +382,12 @@ export const userController = {
         payload.name || payload.email,
       );
 
-      return sendSuccess(reply, result, 200);
+      const query = new URLSearchParams({
+        name: result.user.name,
+        email: result.user.email,
+        provider: "google",
+      });
+      return reply.redirect(`/success.html?${query.toString()}`);
     } catch (err) {
       return sendError(reply, 401, "Google authentication failed");
     }
@@ -438,7 +443,12 @@ export const userController = {
         profile.name || profile.email,
       );
 
-      return sendSuccess(reply, result, 200);
+      const query = new URLSearchParams({
+        name: result.user.name,
+        email: result.user.email,
+        provider: "facebook",
+      });
+      return reply.redirect(`/success.html?${query.toString()}`);
     } catch (err) {
       return sendError(reply, 401, "Facebook authentication failed");
     }
